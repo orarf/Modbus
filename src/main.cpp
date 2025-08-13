@@ -80,7 +80,7 @@ void TaskModbus(void *pvParameters) {
         failCount = 0; // reset counter หลังสแกนใหม่
       }
     }
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
 }
 
