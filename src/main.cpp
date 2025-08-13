@@ -1,77 +1,59 @@
-#include <Arduino.h>
-#include <Preferences.h>
-#include "TBmanager.h"
-#include "commandline.h" 
+#include <ModbusMaster.h>
 
-// Global objects
-TBmanager* tbManager;
-CommandLineManager* cliManager;
-Preferences preferences;
-void RPC_TEST_process1(const JsonVariantConst &data, JsonDocument &response)
-{
-  Serial.println("Received the json RPC method RPC_TEST_process1");
-  StaticJsonDocument<JSON_OBJECT_SIZE(4)> innerDoc;
-  innerDoc["string"] = "exampleResponseString";
-  innerDoc["int"] = 5;
-  innerDoc["float"] = 5.0f;
-  innerDoc["bool"] = true;
-  response["json_data"] = innerDoc;
-}
+#define MAX485_DE 4  // GPIO ควบคุม DE/RE ของ MAX485
+#define MAX485_RE 4  // ต่อร่วมกัน
 
-void RPC_TEST_process2(const JsonVariantConst &data, JsonDocument &response)
-{
-  Serial.println("Received the json RPC method RPC_TEST_process2");
-  StaticJsonDocument<JSON_OBJECT_SIZE(4)> innerDoc;
-  innerDoc["string"] = "exampleResponseString RPC_TEST_process2";
-  innerDoc["int"] = 5;
-  innerDoc["float"] = 5.0f;
-  innerDoc["bool"] = true;
-  response["json_data"] = innerDoc;
-}
+ModbusMaster node;
 
-void RPC_TEST_process3(const JsonVariantConst &data, JsonDocument &response)
-{
-  Serial.println("Received the json RPC method RPC_TEST_process3 ");
-  StaticJsonDocument<JSON_OBJECT_SIZE(4)> innerDoc;
-  innerDoc["string"] = "exampleResponseString";
-  innerDoc["int"] = 5;
-  innerDoc["float"] = 5.0f;
-  innerDoc["bool"] = true;
-  response["json_data"] = innerDoc;
-}
+void preTransmission() { digitalWrite(MAX485_DE, HIGH); }
+void postTransmission() { digitalWrite(MAX485_DE, LOW); }
 
-const RPC_Callback xcallbacks[3] = {
-    {"USER_CONTROL_01", RPC_TEST_process1},
-    {"USER_CONTROL_02", RPC_TEST_process2},
-    {"USER_CONTROL_03", RPC_TEST_process3}};
-void setup() {
-    Serial.begin(9600);
-    delay(1000); 
-    Serial.println("\n\n===== System Booting Up =====");
-    cliManager = new CommandLineManager(nullptr, &preferences);
-    cliManager->loadSettings();
-    Serial.println("--- Loaded Stored Settings ---");
-    Serial.print("  SSID: "); Serial.println(cliManager->getSsid());
-    Serial.print("  Server: "); Serial.println(cliManager->getServer());
-    Serial.print("  Token: "); Serial.println(cliManager->getToken());
-    Serial.println("------------------------------");
-    tbManager = new TBmanager(
-        cliManager->getSsid(),
-        cliManager->getPassword(),
-        cliManager->getServer(),
-        cliManager->getToken()
-    );
-    cliManager = new CommandLineManager(tbManager, &preferences);
-    cliManager->loadSettings(); 
-    tbManager->RPCRoute(xcallbacks);
-    if (cliManager->shouldEnterMenuOnBoot(10000)) {
-       Serial.println("\n>> ผู้ใช้ขัดจังหวะ, เข้าสู่เมนูตั้งค่า");
+// Task สำหรับอ่านค่า Modbus
+void TaskModbus(void *pvParameters) {
+  for (;;) {  // วนลูปไม่รู้จบ
+    uint8_t result = node.readHoldingRegisters(0x0000, 10);  // อ่าน 10 register
+
+    if (result == node.ku8MBSuccess) {
+      Serial.println("Read Holding Registers success:");
+      for (int i = 0; i < 10; i++) {
+        Serial.print("Register ");
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.println(node.getResponseBuffer(i));
+      }
     } else {
-        Serial.println("\n>> หมดเวลา, กำลังเริ่มการเชื่อมต่อเบื้องหลัง...");
-         cliManager->begin();
-        tbManager->begin(); 
+      Serial.print("Read fail. Error code: ");
+      Serial.println(result);
     }
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  // หน่วง 1 วินาที
+  }
 }
-void loop() { 
-    vTaskDelay(pdMS_TO_TICKS(1000)); 
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(MAX485_DE, OUTPUT);
+  pinMode(MAX485_RE, OUTPUT);
+  postTransmission();
+
+  Serial2.begin(9600, SERIAL_8N1, 16, 17); // UART2 RX=16, TX=17
+
+  node.begin(1, Serial2);
+  node.preTransmission(preTransmission);
+  node.postTransmission(postTransmission);
+
+  // สร้าง FreeRTOS Task
+  xTaskCreate(
+    TaskModbus,    // ชื่อฟังก์ชัน Task
+    "ModbusTask",  // ชื่อ Task
+    4096,          // ขนาด stack
+    NULL,          // พารามิเตอร์ส่งเข้า Task
+    1,             // Priority
+    NULL           // ตัว handle
+  );
+}
+
+void loop() {
+  // ว่างไว้ เพราะเราจะทำงานผ่าน Task
 }
