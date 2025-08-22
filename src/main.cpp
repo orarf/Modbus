@@ -9,18 +9,40 @@ ModbusMaster node;
 uint8_t slaveId = 1;
 uint32_t baud = 9600;
 
+// ฟังก์ชันรับ baud rates จาก Serial
+void getBaudRates(uint32_t *baudRates, int &count) {
+  Serial.println("Please enter baud rates separated by commas (2400,4800,9600,19200,38400):");
+  while (!Serial.available()) {
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+  String input = Serial.readStringUntil('\n');
+  count = 0;
+  while (input.length() > 0 && count < 10) {
+    int comma = input.indexOf(',');
+    String numStr = (comma == -1) ? input : input.substring(0, comma);
+    baudRates[count++] = numStr.toInt();
+    if (comma == -1) break;
+    input = input.substring(comma + 1);
+  }
+  Serial.print("Baud rates received: ");
+  for (int i = 0; i < count; i++) {
+    Serial.print(baudRates[i]);
+    Serial.print(" ");
+  }
+  Serial.println();
+}
+
 void preTransmission() { digitalWrite(MAX485_DE, HIGH); }
 void postTransmission() { digitalWrite(MAX485_DE, LOW); }
 
 // ฟังก์ชันสแกนหา Modbus ID และ baud rate
-bool scanModbusDevice(uint8_t &foundId, uint32_t &foundBaud) {
-  uint32_t baudRates[] = {9600, 19200, 38400, 115200};
+bool scanModbusDevice(uint8_t &foundId, uint32_t &foundBaud, uint32_t *baudRates, int baudCount) {
   Serial.println("\n========== Scan Begin Modbus ==========");
-  for (int b = 0; b < 4; b++) {
+  for (int b = 0; b < baudCount; b++) {
     Serial.print("\n[Baud Rate] ");
     Serial.println(baudRates[b]);
     Serial2.begin(baudRates[b], SERIAL_8N1, 16, 17);
-    for (uint8_t id = 1; id <= 247; id++) {
+    for (uint8_t id = 0; id <= 247; id++) {
       Serial.print("  [Scanning] ID: ");
       Serial.print(id);
       Serial.print(" ... ");
@@ -51,11 +73,13 @@ bool scanModbusDevice(uint8_t &foundId, uint32_t &foundBaud) {
 // Task สำหรับอ่านค่า Modbus
 void TaskModbus(void *pvParameters) {
   int failCount = 0;
+  uint32_t baudRates[10];
+  int baudCount = 0;
   for (;;) {
-    uint8_t result = node.readHoldingRegisters(0x0000, 10);
+    uint8_t result = node.readHoldingRegisters(0x0000, 7);
     if (result == node.ku8MBSuccess) {
       Serial.println("Read Holding Registers success:");
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 7; i++) {
         Serial.print("Register ");
         Serial.print(i);
         Serial.print(": ");
@@ -68,7 +92,8 @@ void TaskModbus(void *pvParameters) {
       failCount++;
       if (failCount >= 5) { // ถ้าอ่านไม่สำเร็จ 5 ครั้ง
         Serial.println("Lost connection. Start scanning again...");
-        if (scanModbusDevice(slaveId, baud)) {
+        getBaudRates(baudRates, baudCount);
+        if (scanModbusDevice(slaveId, baud, baudRates, baudCount)) {
           Serial.println("Auto select Modbus device.");
           Serial2.begin(baud, SERIAL_8N1, 16, 17);
           node.begin(slaveId, Serial2);
@@ -91,8 +116,13 @@ void setup() {
   pinMode(MAX485_RE, OUTPUT);
   postTransmission();
 
+  uint32_t baudRates[10];
+  int baudCount = 0;
+  
+  getBaudRates(baudRates, baudCount);
+
   // สแกนหาอุปกรณ์และตั้งค่าอัตโนมัติ
-  if (scanModbusDevice(slaveId, baud)) {
+  if (scanModbusDevice(slaveId, baud, baudRates, baudCount)) {
     Serial.println("Auto select Modbus device.");
     Serial2.begin(baud, SERIAL_8N1, 16, 17);
     node.begin(slaveId, Serial2);
@@ -116,5 +146,5 @@ void setup() {
 }
 
 void loop() {
-  // ว่างไว้ เพราะเราจะทำงานผ่าน Task
+  // ว่างไว้ เพราะเราจะทำงานผ่าน
 }
