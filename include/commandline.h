@@ -37,7 +37,8 @@ private:
         SET_TOKEN,
         SAVE_AND_REBOOT,
         SHOW_NPK,
-        SHOW_SENSOR
+        SHOW_SENSOR,
+        SHOW_SOIL   
         
     };
 
@@ -57,6 +58,7 @@ private:
         Serial.println("3: Scan for WiFi");
         Serial.println("4: Show NPK values"); // ตัวเลือกใหม่
         Serial.println("5: Show Sensor values"); // ตัวเลือกใหม่
+        Serial.println("6: Show Soil Moisture"); 
         Serial.print("Please enter your choice and press Enter: ");
         menuNeedsDisplay = false;
     }
@@ -185,6 +187,15 @@ private:
         }
     }
 
+    void showSoilLoop()
+    {
+        int rawValue = analogRead(34); // ✅ ใช้ GPIO34 (ADC1_CH6)
+        float percent = map(rawValue, 4095, 1400, 0, 100);
+
+        Serial.printf("Soil Moisture Raw: %d, %.1f %%\n", rawValue, percent);
+        Serial.println("Press q to main menu\n");
+    }
+    
     void cliTask() {
         while(true){
             switch(currentState){
@@ -197,6 +208,7 @@ private:
                         else if(choice=="3") currentState = SCAN_WIFI;
                         else if(choice=="4") currentState = SHOW_NPK;
                         else if(choice=="5") currentState = SHOW_SENSOR;
+                        else if(choice=="6") currentState = SHOW_SOIL;
                         else if(choice.length()>0) Serial.println("Invalid choice");
                         menuNeedsDisplay = true;
                     }
@@ -312,6 +324,20 @@ private:
                     }
 
                     vTaskDelay(pdMS_TO_TICKS(1000)); // delay 1 วิ ก่อนอ่านค่าใหม่
+                    break;
+
+                case SHOW_SOIL:
+                    showSoilLoop();
+                    if (Serial.available() > 0)
+                    {
+                        char cmd = Serial.read();
+                        if (cmd == 'q')
+                        {
+                            currentState = MAIN_MENU;
+                            menuNeedsDisplay = true;
+                        }
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(1000)); // delay 1 วิ
                     break;
                 }
             vTaskDelay(pdMS_TO_TICKS(50));

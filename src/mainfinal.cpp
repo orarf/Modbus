@@ -11,6 +11,7 @@
 #define LED2 19
 #define LED3 18
 #define LED4 5
+#define SOIL_PIN 34 
 Preferences prefs;
 SemaphoreHandle_t xMutex;  // สร้าง Mutex
 bool ledShouldBeOn1 = false;  // ตัวแปรที่ใช้ร่วมกัน
@@ -143,6 +144,19 @@ void sensorCallback(TimerHandle_t xTimer) {
       Serial.printf("Modbus Error Temp:%d Light:%d Hum:%d\n", errTemp, errLight, errHum);
   }
 }
+void soilCallback(TimerHandle_t xTimer)
+{
+    int rawValue = analogRead(SOIL_PIN);
+
+    // ✅ แปลงค่า 0–4095 → 0–100%
+    int soilPercent = map(rawValue, 4095, 1500, 0, 100);
+
+    // ✅ ส่งขึ้น ThingsBoard
+    tbManager->sendAttributeData("SoilMoistureRaw", rawValue); // ค่าดิบ
+    tbManager->sendAttributeData("SoilMoisture", soilPercent); // ค่าเป็นเปอร์เซ็นต์
+    tbManager->sendTelemetryData("SoilMoistureRaw", rawValue); // ค่าดิบ
+    tbManager->sendTelemetryData("SoilMoisture", soilPercent); // ค่าเป็นเqปอร์เซ็นต์
+}
 
 void TaskLED(void *pvParameters) {
   bool previousState1 = !ledShouldBeOn1;
@@ -256,12 +270,14 @@ void setup() {
     }
     TimerHandle_t npkTimer = xTimerCreate("npkTimer", pdMS_TO_TICKS(60000), pdTRUE, (void *)0, npkCallback);
     TimerHandle_t sensorTimer = xTimerCreate("sensorTimer", pdMS_TO_TICKS(60000), pdTRUE, (void *)0, sensorCallback);
-
+    TimerHandle_t soilTimer = xTimerCreate("soilTimer", pdMS_TO_TICKS(60000), pdTRUE, (void *)0, soilCallback);
     // เริ่ม Timer
     if (npkTimer != NULL)
         xTimerStart(npkTimer, 0);
-    if (sensorTimer != NULL)
+    if (sensorTimer != NULL)        
         xTimerStart(sensorTimer, 0);
+    if (soilTimer != NULL)        
+        xTimerStart(soilTimer, 0);
     xTaskCreate(TaskLED, "LED Task", 2048, NULL, 1, NULL);
 }
 
