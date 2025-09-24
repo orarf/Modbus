@@ -12,6 +12,8 @@
 #define LED3 18
 #define LED4 5
 #define SOIL_PIN 34
+
+
 Preferences prefs;
 SemaphoreHandle_t xMutex;    // สร้าง Mutex
 bool ledShouldBeOn1 = false; // ตัวแปรที่ใช้ร่วมกัน
@@ -19,23 +21,28 @@ bool ledShouldBeOn2 = false;
 bool ledShouldBeOn3 = false;
 bool ledShouldBeOn4 = false;
 HardwareSerial RS485(2); // Serial2 (RX=16, TX=17)
-ModbusRTUMaster modbus(RS485, MAX485_DE, MAX485_RE);
+// ModbusRTUMaster modbus(RS485, MAX485_DE, MAX485_RE);
+ModbusRTUMaster modbus(RS485);
 uint8_t slaveId = 3;
 uint8_t slaveId2 = 4; // Modbus Slave ID
 uint32_t baud = 4800;
 
 void preTransmission()
 {
-  digitalWrite(MAX485_DE, HIGH);
-  digitalWrite(MAX485_RE, HIGH);
-  delayMicroseconds(100);
+  // digitalWrite(MAX485_DE, HIGH);
+  // digitalWrite(MAX485_RE, HIGH);
+  delay(30);
+  // delayMicroseconds(100);
+  
+  
 }
 
 void postTransmission()
 {
-  digitalWrite(MAX485_DE, LOW);
-  digitalWrite(MAX485_RE, LOW);
-  delayMicroseconds(100);
+  // digitalWrite(MAX485_DE, LOW);
+  // digitalWrite(MAX485_RE, LOW);
+  delay(30);
+  // delayMicroseconds(100);
 }
 
 // ---------------- RPC Example ----------------
@@ -117,30 +124,19 @@ const RPC_Callback xcallbacks[3] = {
     {"USER_CONTROL_02", RPC_TEST_process2},
     {"USER_CONTROL_03", RPC_TEST_process3}};
 
-void npkCallback(TimerHandle_t xTimer)
-{
   uint16_t nitrogen = 0, phosphorus = 0, potassium = 0;
   uint16_t rawTemp = 0;
   uint16_t rawLight = 0;
   uint16_t rawHum = 0;
-  int rawValue = analogRead(SOIL_PIN);
-  int soilPercent = map(rawValue, 4095, 1500, 0, 100);
+  int rawValue = 0;
+  int soilPercent = 0;
+void sentder(TimerHandle_t xTimer)
+{
   tbManager->sendAttributeData("SoilMoistureRaw", rawValue); // ค่าดิบ
   tbManager->sendAttributeData("SoilMoisture", soilPercent); // ค่าเป็นเปอร์เซ็นต์
   tbManager->sendTelemetryData("SoilMoistureRaw", rawValue); // ค่าดิบ
   tbManager->sendTelemetryData("SoilMoisture", soilPercent); // ค่าเป็นเqปอร์เซ็นต์
 
-  preTransmission();
-  ModbusRTUMasterError errN = modbus.readHoldingRegisters(slaveId, 13, &nitrogen, 1);
-  ModbusRTUMasterError errP = modbus.readHoldingRegisters(slaveId, 15, &phosphorus, 1);
-  ModbusRTUMasterError errK = modbus.readHoldingRegisters(slaveId, 16, &potassium, 1);
-  ModbusRTUMasterError errTemp = modbus.readHoldingRegisters(slaveId2, 1, &rawTemp, 1);   // register 1 = temp
-  ModbusRTUMasterError errLight = modbus.readHoldingRegisters(slaveId2, 2, &rawLight, 1); // register 2 = light
-  ModbusRTUMasterError errHum = modbus.readHoldingRegisters(slaveId2, 0, &rawHum, 1);     // register 3 = humidity
-  postTransmission();
-
-  if (errTemp == MODBUS_RTU_MASTER_SUCCESS && errLight == MODBUS_RTU_MASTER_SUCCESS && errHum == MODBUS_RTU_MASTER_SUCCESS)
-  {
     float temperature = rawTemp / 10.0;
     float humidity = rawHum / 10.0;
     float light = rawLight * 1.0;
@@ -151,25 +147,60 @@ void npkCallback(TimerHandle_t xTimer)
     tbManager->sendAttributeData("Temperature", temperature);
     tbManager->sendAttributeData("Humidity", humidity);
     tbManager->sendAttributeData("Light", light);
-  }
-  else
-  {
-    Serial.printf("Modbus Error Temp:%d Light:%d Hum:%d\n", errTemp, errLight, errHum);
-  }
-  if (errN == MODBUS_RTU_MASTER_SUCCESS && errP == MODBUS_RTU_MASTER_SUCCESS && errK == MODBUS_RTU_MASTER_SUCCESS)
-  {
+
     tbManager->sendTelemetryData("Nitrogen", nitrogen);
     tbManager->sendTelemetryData("Phosphorus", phosphorus);
     tbManager->sendTelemetryData("Potassium", potassium);
     tbManager->sendAttributeData("Nitrogen", nitrogen);
     tbManager->sendAttributeData("Phosphorus", phosphorus);
-    tbManager->sendAttributeData("Potassium", potassium);
+    tbManager->sendAttributeData("Phosphorus", potassium);
+   
+}
+void reader(TimerHandle_t xTimer)
+{
+  int rawValue = analogRead(SOIL_PIN);
+  int soilPercent = map(rawValue, 4095, 1500, 0, 100);
+  uint16_t _nitrogen = 0, _phosphorus = 0, _potassium = 0;
+  uint16_t _rawTemp = 0;
+  uint16_t _rawLight = 0;
+  uint16_t _rawHum = 0;
+
+
+  preTransmission();
+  ModbusRTUMasterError errN = modbus.readHoldingRegisters(slaveId, 13, &_nitrogen, 1);
+  ModbusRTUMasterError errP = modbus.readHoldingRegisters(slaveId, 15, &_phosphorus, 1);
+  ModbusRTUMasterError errK = modbus.readHoldingRegisters(slaveId, 16, &_potassium, 1);
+  ModbusRTUMasterError errTemp = modbus.readHoldingRegisters(slaveId2, 1, &_rawTemp, 1);   // register 1 = temp
+  ModbusRTUMasterError errLight = modbus.readHoldingRegisters(slaveId2, 2, &_rawLight, 1); // register 2 = light
+  ModbusRTUMasterError errHum = modbus.readHoldingRegisters(slaveId2, 0, &_rawHum, 1);     // register 3 = humidity
+  postTransmission();
+ if (errTemp == MODBUS_RTU_MASTER_SUCCESS && errLight == MODBUS_RTU_MASTER_SUCCESS && errHum == MODBUS_RTU_MASTER_SUCCESS)
+  {
+    rawTemp = _rawTemp;
+    rawHum = _rawHum;
+    rawLight = _rawLight;
+
   }
   else
   {
-    Serial.printf("Modbus Error N:%d P:%d K:%d\n", errN, errP, errK);
+    // Serial.printf("Modbus Error Temp:%d Light:%d Hum:%d\n", errTemp, errLight, errHum);
   }
+  if (errN == MODBUS_RTU_MASTER_SUCCESS && errP == MODBUS_RTU_MASTER_SUCCESS && errK == MODBUS_RTU_MASTER_SUCCESS)
+  {
+    nitrogen = _nitrogen;
+    phosphorus = _phosphorus;
+    potassium = _potassium;
+  }
+  else
+  {
+    // Serial.printf("Modbus Error N:%d P:%d K:%d\n", errN, errP, errK);
+  }
+  
 }
+
+
+
+
 
 void TaskLED(void *pvParameters)
 {
@@ -246,9 +277,9 @@ void setup()
   pinMode(LED4, OUTPUT);
   xMutex = xSemaphoreCreateMutex();
 
-  pinMode(MAX485_DE, OUTPUT);
-  pinMode(MAX485_RE, OUTPUT);
-  postTransmission();
+  // pinMode(MAX485_DE, OUTPUT);
+  // pinMode(MAX485_RE, OUTPUT);
+  // postTransmission();
 
   RS485.begin(baud, SERIAL_8N1, 16, 17);
   modbus.begin(baud, SERIAL_8N1);
@@ -282,7 +313,7 @@ void setup()
   tbManager->RPCRoute(xcallbacks);
 
   // ตรวจสอบว่ากดเข้าเมนูตั้งค่าไหม
-  if (cliManager->shouldEnterMenuOnBoot(10000))
+  if (cliManager->shouldEnterMenuOnBoot(5000))
   {
     Serial.println("\n>> User entered setup menu");
     cliManager->begin();
@@ -293,10 +324,13 @@ void setup()
     cliManager->begin();
     tbManager->begin();
   }
-  TimerHandle_t npkTimer = xTimerCreate("npkTimer", pdMS_TO_TICKS(60000), pdTRUE, (void *)0, npkCallback);
+  TimerHandle_t sentDer = xTimerCreate("sensorTimer", pdMS_TO_TICKS(60000), pdTRUE, (void *)0, sentder);
+  TimerHandle_t reaDer = xTimerCreate("readTimer", pdMS_TO_TICKS(5000), pdTRUE, (void *)0, reader);
   // เริ่ม Timer
-  if (npkTimer != NULL)
-    xTimerStart(npkTimer, 0);
+  if (sentDer != NULL)
+    xTimerStart(sentDer, 0);
+  if (reaDer != NULL)
+    xTimerStart(reaDer, 0);
   xTaskCreate(TaskLED, "LED Task", 2048, NULL, 1, NULL);
 }
 

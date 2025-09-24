@@ -151,6 +151,7 @@ private:
         else
         {
             Serial.printf("Modbus Error N:%d P:%d K:%d\n", errN, errP, errK);
+            Serial.println("Press q to main menu\n");
         }
     }
 
@@ -184,13 +185,14 @@ private:
         else
         {
             Serial.printf("Modbus Error Temp:%d Light:%d Humidity:%d\n", errTemp, errLight, errHum);
+            Serial.println("Press q to main menu\n");
         }
     }
 
     void showSoilLoop()
     {
         int rawValue = analogRead(34); // ✅ ใช้ GPIO34 (ADC1_CH6)
-        float percent = map(rawValue, 4095, 1400, 0, 100);
+        float percent = map(rawValue, 4095, 0, 0, 100);
 
         Serial.printf("Soil Moisture Raw: %d, %.1f %%\n", rawValue, percent);
         Serial.println("Press q to main menu\n");
