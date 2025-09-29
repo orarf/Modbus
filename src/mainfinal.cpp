@@ -156,9 +156,14 @@ void sentder(TimerHandle_t xTimer)
     tbManager->sendAttributeData("Phosphorus", potassium);
    
 }
-void reader(TimerHandle_t xTimer)
+
+void reader(void *pvParameters)
 {
-  int rawValue = analogRead(SOIL_PIN);
+  RS485.begin(baud, SERIAL_8N1, 16, 17);
+  modbus.begin(baud, SERIAL_8N1);
+  while (1)
+  {
+    int rawValue = analogRead(SOIL_PIN);
   int soilPercent = map(rawValue, 4095, 1500, 0, 100);
   uint16_t _nitrogen = 0, _phosphorus = 0, _potassium = 0;
   uint16_t _rawTemp = 0;
@@ -196,10 +201,9 @@ void reader(TimerHandle_t xTimer)
     // Serial.printf("Modbus Error N:%d P:%d K:%d\n", errN, errP, errK);
   }
   
+    vTaskDelay(pdMS_TO_TICKS(5000));
+  }
 }
-
-
-
 
 
 void TaskLED(void *pvParameters)
@@ -281,8 +285,7 @@ void setup()
   // pinMode(MAX485_RE, OUTPUT);
   // postTransmission();
 
-  RS485.begin(baud, SERIAL_8N1, 16, 17);
-  modbus.begin(baud, SERIAL_8N1);
+  
 
   Serial.println("\n===== System Booting Up =====");
 
@@ -313,25 +316,17 @@ void setup()
   tbManager->RPCRoute(xcallbacks);
 
   // ตรวจสอบว่ากดเข้าเมนูตั้งค่าไหม
-  if (cliManager->shouldEnterMenuOnBoot(5000))
-  {
-    Serial.println("\n>> User entered setup menu");
-    cliManager->begin();
-  }
-  else
-  {
-    Serial.println("\n>> Booting automatic connection...");
-    cliManager->begin();
-    tbManager->begin();
-  }
+  cliManager->begin();
+  tbManager->begin();
   TimerHandle_t sentDer = xTimerCreate("sensorTimer", pdMS_TO_TICKS(60000), pdTRUE, (void *)0, sentder);
-  TimerHandle_t reaDer = xTimerCreate("readTimer", pdMS_TO_TICKS(5000), pdTRUE, (void *)0, reader);
-  // เริ่ม Timer
+  // TimerHandle_t reaDer = xTimerCreate("readTimer", pdMS_TO_TICKS(5000), pdTRUE, (void *)0, reader);
+  // // เริ่ม Timer
   if (sentDer != NULL)
     xTimerStart(sentDer, 0);
-  if (reaDer != NULL)
-    xTimerStart(reaDer, 0);
+  // if (reaDer != NULL)
+  //   xTimerStart(reaDer, 0);
   xTaskCreate(TaskLED, "LED Task", 2048, NULL, 1, NULL);
+  xTaskCreate(reader, "Read Sensor Task", 4096, NULL, 1, NULL);
 }
 
 // ---------------- Loop ----------------

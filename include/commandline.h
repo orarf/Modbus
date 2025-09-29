@@ -66,7 +66,7 @@ private:
     void displayConnectionSettingsMenu() {
         Serial.println("\n--- Connection Settings ---");
         Serial.print("  1: Set SSID     (current: '"); Serial.print(tempSsid); Serial.println("')");
-        Serial.print("  2: Set Password   (current: '"); Serial.print(String(tempPass).length() > 0 ? "********" : "<empty>"); Serial.println("')");
+        Serial.print("  2: Set Password   (current: '"); Serial.print(tempPass); Serial.println("')");
         Serial.print("  3: Set Server     (current: '"); Serial.print(tempServer); Serial.println("')");
         Serial.print("  4: Set Token      (current: '"); Serial.print(tempToken); Serial.println("')");
         Serial.println("---------------------------");
