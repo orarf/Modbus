@@ -192,7 +192,7 @@ private:
     void showSoilLoop()
     {
         int rawValue = analogRead(34); // ✅ ใช้ GPIO34 (ADC1_CH6)
-        float percent = map(rawValue, 4095, 0, 0, 100);
+        float percent = map(rawValue, 4095, 1500, 0, 100);
 
         Serial.printf("Soil Moisture Raw: %d, %.1f %%\n", rawValue, percent);
         Serial.println("Press q to main menu\n");

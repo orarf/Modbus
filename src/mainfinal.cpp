@@ -229,12 +229,16 @@ void TaskLED(void *pvParameters)
       currentState3 = ledShouldBeOn3;
       currentState4 = ledShouldBeOn4;
       xSemaphoreGive(xMutex);
-    }
+    } 
 
     // เขียนค่าออกไปยัง GPIO
     digitalWrite(LED1, currentState1 ? HIGH : LOW);
+
     digitalWrite(LED2, currentState2 ? HIGH : LOW);
-    digitalWrite(LED3, currentState3 ? HIGH : LOW);
+   
+
+    digitalWrite(LED3, currentState3 ? HIGH : LOW);   
+
     digitalWrite(LED4, currentState4 ? HIGH : LOW);
 
     // บันทึกค่าเฉพาะเมื่อมีการเปลี่ยนแปลง
